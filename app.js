@@ -1,4 +1,3 @@
-
 // ── Generar estrellas/datos en el cielo ──
 (function(){
   const stars=document.getElementById('lpStars');
