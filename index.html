@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+<title>AgroVision · Agricultura Basada en Datos</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 140'%3E%3Ccircle cx='70' cy='70' r='52' fill='%230a2818' stroke='%237ecf5a' stroke-width='3'/%3E%3Cpath d='M70 105 Q70 75 70 50' stroke='%23a8e063' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3Cpath d='M70 78 Q50 70 44 52 Q64 56 70 74 Z' fill='%237ecf5a'/%3E%3Cpath d='M70 68 Q90 60 96 42 Q76 46 70 64 Z' fill='%231a9850'/%3E%3Ccircle cx='70' cy='46' r='6' fill='%23a8e063'/%3E%3C/svg%3E"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<!-- ═══════════════════════════════════════════════════════════
+     LANDING / PANTALLA DE BIENVENIDA · AgroVision
+     ═══════════════════════════════════════════════════════════ -->
+<div id="landing">
+
+<div class="lp-bg">
+  <div class="lp-sky"></div>
+  <div class="lp-field"></div>
+  <div class="lp-grid"></div>
+  <div class="lp-stars" id="lpStars"></div>
+
+  <!-- SATÉLITE SVG -->
+  <div class="lp-satellite">
+    <svg viewBox="0 0 100 100" width="100%" height="100%">
+      <rect x="40" y="38" width="20" height="24" rx="3" fill="#c8d6e0" stroke="#6fcf4a" stroke-width="1.5"/>
+      <rect x="8" y="42" width="28" height="16" rx="2" fill="#1a3a5a" stroke="#4a90d9" stroke-width="1"/>
+      <line x1="15" y1="42" x2="15" y2="58" stroke="#4a90d9" stroke-width="0.5"/>
+      <line x1="22" y1="42" x2="22" y2="58" stroke="#4a90d9" stroke-width="0.5"/>
+      <line x1="29" y1="42" x2="29" y2="58" stroke="#4a90d9" stroke-width="0.5"/>
+      <rect x="64" y="42" width="28" height="16" rx="2" fill="#1a3a5a" stroke="#4a90d9" stroke-width="1"/>
+      <line x1="71" y1="42" x2="71" y2="58" stroke="#4a90d9" stroke-width="0.5"/>
+      <line x1="78" y1="42" x2="78" y2="58" stroke="#4a90d9" stroke-width="0.5"/>
+      <line x1="85" y1="42" x2="85" y2="58" stroke="#4a90d9" stroke-width="0.5"/>
+      <circle cx="50" cy="34" r="5" fill="none" stroke="#6fcf4a" stroke-width="1.5"/>
+      <line x1="50" y1="38" x2="50" y2="30" stroke="#6fcf4a" stroke-width="1"/>
+      <circle cx="50" cy="50" r="2.5" fill="#6fcf4a"><animate attributeName="opacity" values="1;0.2;1" dur="1.5s" repeatCount="indefinite"/></circle>
+    </svg>
+  </div>
+  <div class="lp-sat-beam"></div>
+
+  <!-- DRON SVG -->
+  <div class="lp-drone">
+    <svg viewBox="0 0 120 70" width="100%" height="100%">
+      <line x1="60" y1="40" x2="20" y2="20" stroke="#2d4a38" stroke-width="3"/>
+      <line x1="60" y1="40" x2="100" y2="20" stroke="#2d4a38" stroke-width="3"/>
+      <line x1="60" y1="40" x2="22" y2="52" stroke="#2d4a38" stroke-width="3"/>
+      <line x1="60" y1="40" x2="98" y2="52" stroke="#2d4a38" stroke-width="3"/>
+      <ellipse cx="60" cy="42" rx="14" ry="9" fill="#0d2418" stroke="#6fcf4a" stroke-width="1.5"/>
+      <circle cx="60" cy="48" r="4" fill="#6fcf4a"/>
+      <circle cx="60" cy="48" r="2" fill="#06140c"/>
+      <g class="lp-drone-prop" style="transform-origin:20px 20px"><ellipse cx="20" cy="20" rx="14" ry="3" fill="rgba(111,207,74,0.38)"/></g>
+      <g class="lp-drone-prop" style="transform-origin:100px 20px"><ellipse cx="100" cy="20" rx="14" ry="3" fill="rgba(111,207,74,0.38)"/></g>
+      <g class="lp-drone-prop" style="transform-origin:22px 52px"><ellipse cx="22" cy="52" rx="14" ry="3" fill="rgba(111,207,74,0.38)"/></g>
+      <g class="lp-drone-prop" style="transform-origin:98px 52px"><ellipse cx="98" cy="52" rx="14" ry="3" fill="rgba(111,207,74,0.38)"/></g>
+      <circle cx="20" cy="20" r="3" fill="#2d4a38"/>
+      <circle cx="100" cy="20" r="3" fill="#2d4a38"/>
+      <circle cx="22" cy="52" r="3" fill="#2d4a38"/>
+      <circle cx="98" cy="52" r="3" fill="#2d4a38"/>
+    </svg>
+  </div>
+</div>
+
+<!-- CONTENIDO LANDING -->
+<div class="lp-content">
+  <!-- Logo rediseñado con dorado -->
+  <div class="lp-logo">
+    <svg viewBox="0 0 140 140" width="120" height="120">
+      <defs>
+        <linearGradient id="logoG1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#6fcf4a"/>
+          <stop offset="100%" stop-color="#3d8a57"/>
+        </linearGradient>
+        <linearGradient id="logoG2" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#2e6b44"/>
+          <stop offset="100%" stop-color="#9de07a"/>
+        </linearGradient>
+        <linearGradient id="logoGold" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#e8b96a"/>
+          <stop offset="100%" stop-color="#c8963a"/>
+        </linearGradient>
+        <radialGradient id="logoBg" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#163625"/>
+          <stop offset="100%" stop-color="#0b1d12"/>
+        </radialGradient>
+      </defs>
+      <!-- Outer ring (gold) -->
+      <circle cx="70" cy="70" r="63" fill="none" stroke="url(#logoGold)" stroke-width="1.5" stroke-dasharray="5 7" opacity="0.5">
+        <animateTransform attributeName="transform" type="rotate" from="0 70 70" to="360 70 70" dur="44s" repeatCount="indefinite"/>
+      </circle>
+      <!-- Base -->
+      <circle cx="70" cy="70" r="52" fill="url(#logoBg)" stroke="url(#logoG1)" stroke-width="2.5"/>
+      <!-- Plant stem -->
+      <path d="M70 105 Q70 75 70 50" stroke="url(#logoG2)" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <!-- Leaves -->
+      <path d="M70 78 Q50 70 44 52 Q64 56 70 74 Z" fill="url(#logoG1)"/>
+      <path d="M70 68 Q90 60 96 42 Q76 46 70 64 Z" fill="url(#logoG2)"/>
+      <path d="M70 90 Q54 86 48 72 Q66 76 70 88 Z" fill="url(#logoG1)" opacity="0.85"/>
+      <!-- Top bud (gold) -->
+      <circle cx="70" cy="46" r="6" fill="url(#logoGold)">
+        <animate attributeName="r" values="6;7;6" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <!-- Orbit dot (lime) -->
+      <g>
+        <circle cx="70" cy="18" r="3" fill="#6fcf4a"/>
+        <animateTransform attributeName="transform" type="rotate" from="0 70 70" to="360 70 70" dur="8s" repeatCount="indefinite"/>
+      </g>
+      <!-- Orbit dot (gold) -->
+      <g>
+        <circle cx="122" cy="70" r="2.5" fill="#c8963a"/>
+        <animateTransform attributeName="transform" type="rotate" from="120 70 70" to="480 70 70" dur="14s" repeatCount="indefinite"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="lp-eyebrow"><span class="dot"></span> Agricultura Basada en Datos</div>
+
+  <h1 class="lp-title">
+    AgroVision
+    <span class="accent">Inteligencia Satelital Agrícola</span>
+  </h1>
+
+  <p class="lp-subtitle">
+    Monitorea la salud de tus huertos desde el espacio. Índices espectrales,
+    análisis multitemporal y decisiones precisas — todo en una plataforma.
+  </p>
+
+  <div class="lp-crops" id="lpCrops"></div>
+
+  <button class="lp-cta" onclick="enterPlatform()">
+    Comencemos
+    <span class="arrow">→</span>
+  </button>
+
+  <div class="lp-stats">
+    <div class="lp-stat"><div class="num">8</div><div class="lbl">Índices espectrales</div></div>
+    <div class="lp-stat"><div class="num">10m</div><div class="lbl">Resolución Sentinel-2</div></div>
+    <div class="lp-stat"><div class="num">∞</div><div class="lbl">Historial de datos</div></div>
+  </div>
+</div>
+
+<div class="lp-author">
+  <div class="by">Plataforma creada por</div>
+  <div class="name">Matías Meza Paredes</div>
+  <div class="role">Ingeniero Agrónomo</div>
+</div>
+
+</div>
+
+
+<!-- HEADER -->
+<header>
+  <div class="logo-mark">🛰️</div>
+  <div class="header-titles">
+    <h1>AgroVision</h1>
+    <p>Sentinel-2 · Copernicus · Exportadora Los Olmos</p>
+  </div>
+  <div class="header-right">
+    <div class="badge connecting" id="tokenBadge">⏳ Conectando…</div>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('analisis')" id="tab-analisis">🛰️ Análisis</button>
+  <button class="tab-btn" onclick="switchTab('kmls')" id="tab-kmls">📁 KMLs</button>
+  <button class="tab-btn" onclick="switchTab('historial')" id="tab-historial">📊 Historial</button>
+  <button class="tab-btn" onclick="switchTab('biblioteca')" id="tab-biblioteca">📖 Biblioteca</button>
+</div>
+
+<!-- ═══════════════ TAB: ANÁLISIS ═══════════════ -->
+<div class="tab-content active" id="content-analisis">
+  <div class="main">
+    <div class="sidebar">
+
+      <!-- Índice -->
+      <div class="sec">
+        <div class="sec-label">📐 Índice espectral</div>
+        <div class="index-grid" id="indexGrid"></div>
+        <div class="idx-info" id="idxInfo">Selecciona un índice para ver su descripción</div>
+      </div>
+
+      <!-- Config -->
+      <div class="sec">
+        <div class="sec-label">📡 Configuración</div>
+        <label class="fl">Satélite</label>
+        <select id="satelite">
+          <option value="S2L2A">Sentinel-2 L2A (10m)</option>
+          <option value="S2L1C">Sentinel-2 L1C (10m)</option>
+        </select>
+        <label class="fl">Fecha inicio</label>
+        <input type="date" id="fechaInicio" value="2024-09-01"/>
+        <label class="fl">Fecha fin</label>
+        <input type="date" id="fechaFin" value="2024-12-31"/>
+        <label class="fl">Máximo de nubes</label>
+        <input type="range" id="nubes" min="0" max="100" value="20" step="5"
+               oninput="document.getElementById('nubesVal').textContent=this.value+'%'"/>
+        <div class="rv" id="nubesVal">20%</div>
+      </div>
+
+      <!-- Capa visual -->
+      <div class="sec">
+        <div class="sec-label">🗂️ Capa visual</div>
+        <div class="layer-row">
+          <button class="layer-btn active" id="btnIndice" onclick="setLayer('indice')">Índice</button>
+          <button class="layer-btn" id="btnRGB" onclick="setLayer('rgb')">Color real</button>
+          <button class="layer-btn" id="btnFalse" onclick="setLayer('false')">Infrarrojo</button>
+        </div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+          <label class="fl" style="margin:0;min-width:72px">Opacidad</label>
+          <input type="range" id="opacidad" min="0" max="100" value="88" step="4"
+                 oninput="document.getElementById('opVal').textContent=this.value+'%';updateOpacity(this.value)"/>
+          <span style="font-size:10px;font-family:'JetBrains Mono';color:var(--g400);min-width:30px" id="opVal">88%</span>
+        </div>
+      </div>
+
+      <!-- Visualización avanzada -->
+      <div class="sec">
+        <div class="sec-label">🎨 Estilo de visualización</div>
+        <label class="fl">Rampa de color</label>
+        <div class="pal-select-wrap">
+          <div class="pal-current" onclick="togglePalDropdown()">
+            <div class="pc-bar" id="palCurrentBar"></div>
+            <span class="pc-name" id="palCurrentName">Rojo-Amarillo-Verde</span>
+            <span class="pc-arrow">▼</span>
+          </div>
+          <div class="pal-dropdown" id="palDropdown"></div>
+        </div>
+        <div class="viz-toggle">
+          <button class="viz-toggle-btn active" id="vizContinuo" onclick="setVizMode(true)">🌈 Continuo</button>
+          <button class="viz-toggle-btn" id="vizDiscreto" onclick="setVizMode(false)">▦ Clases</button>
+        </div>
+        <div id="clasesWrap" style="display:none;margin-top:10px">
+          <label class="fl">Número de clases (subdivisiones)</label>
+          <div class="clases-control">
+            <input type="range" id="nClases" min="3" max="12" value="7" step="1"
+                   oninput="document.getElementById('clasesBadge').textContent=this.value;vizConfig.nClases=parseInt(this.value);updateVizLegend()"/>
+            <span class="clases-badge" id="clasesBadge">7</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botón calcular -->
+      <div class="sec">
+        <button class="btn btn-primary" id="btnCalc" onclick="calcular()">▶ &nbsp;Calcular índice</button>
+        <div id="statusMsg"></div>
+      </div>
+
+      <!-- Estadísticas -->
+      <div class="sec">
+        <div class="sec-label">📊 Estadísticas</div>
+        <div id="statsContainer"><p class="ph">Dibuja un área o carga un KML<br>y presiona Calcular</p></div>
+      </div>
+
+      <!-- Leyenda -->
+      <div class="sec">
+        <div class="sec-label">🎨 Leyenda</div>
+        <div class="legend-bar" id="legendBar"></div>
+        <div class="legend-labels" id="legendLabels"></div>
+        <div id="legendDesc" style="margin-top:7px;font-size:10px;color:#7a9e8a;line-height:1.8"></div>
+      </div>
+
+      <!-- Serie temporal -->
+      <div class="sec">
+        <div class="sec-label">📈 Serie temporal</div>
+        <div id="chartContainer"><p class="ph">El gráfico aparecerá<br>tras calcular</p></div>
+      </div>
+
+      <!-- Exportación -->
+      <div class="sec">
+        <div class="sec-label">📥 Exportar resultados</div>
+        <div class="export-bar" id="exportBar" style="display:none">
+          <button class="export-btn" onclick="exportarExcel()"><span>📊</span> Excel</button>
+          <button class="export-btn" onclick="exportarMapa()"><span>📸</span> Imagen mapa</button>
+          <button class="export-btn" onclick="exportarIndicePNG()"><span>🗺️</span> PNG índice</button>
+          <button class="export-btn" onclick="exportarPDF()"><span>📄</span> Informe</button>
+        </div>
+        <p class="ph" id="exportPlaceholder" style="padding:8px 0">Calcula un índice para<br>habilitar la exportación</p>
+      </div>
+
+    </div><!-- /sidebar -->
+    <div id="map">
+      <!-- Badge fecha de imagen satelital -->
+      <div class="map-date-badge" id="mapDateBadge" style="display:none">
+        <span class="mdb-icon">🛰️</span>
+        <div>
+          <div class="mdb-label">Imagen satelital</div>
+          <div class="mdb-date" id="mapDateValue">—</div>
+        </div>
+      </div>
+
+      <!-- Botón ubicación actual GPS -->
+      <button class="map-gps-btn" id="gpsBtn" onclick="irAMiUbicacion()" title="Mi ubicación actual">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/>
+          <line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/>
+          <line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/>
+        </svg>
+      </button>
+
+      <!-- Timeline de fechas tipo Google Earth -->
+      <div class="map-timeline" id="mapTimeline" style="display:none">
+        <div class="mtl-header">
+          <span class="mtl-title">📅 Línea de tiempo satelital</span>
+          <button class="mtl-close" onclick="cerrarTimeline()">✕</button>
+        </div>
+        <div class="mtl-body">
+          <button class="mtl-play" id="mtlPlay" onclick="toggleTimelinePlay()">▶</button>
+          <div class="mtl-slider-wrap">
+            <input type="range" id="mtlSlider" min="0" max="0" value="0" step="1" oninput="onTimelineSlide(this.value)"/>
+            <div class="mtl-current" id="mtlCurrent">—</div>
+          </div>
+        </div>
+        <div class="mtl-hint" id="mtlHint">Cargando fechas disponibles…</div>
+      </div>
+
+      <div class="watermark">Creado por<br>Ing. Agr. Matías Meza Paredes</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB: KMLs ═══════════════ -->
+<div class="tab-content" id="content-kmls">
+  <div class="sidebar">
+    <div class="sec">
+      <div class="sec-label">📤 Subir KML</div>
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('kmlInput').click()"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleDrop(event)">
+        <div class="uz-icon">📂</div>
+        <strong style="font-size:12px;color:var(--g600)">Haz clic o arrastra un KML</strong>
+        <p>Archivos .kml o .kmz</p>
+      </div>
+      <input type="file" id="kmlInput" accept=".kml,.kmz" onchange="handleKMLFile(this.files[0])"/>
+      <label class="fl">Nombre del área</label>
+      <input type="text" id="kmlNombre" placeholder="Ej: Cuartel Norte — Manzano"/>
+      <label class="fl">Descripción</label>
+      <textarea id="kmlDesc" placeholder="Variedad, superficie, observaciones…"></textarea>
+      <button class="btn btn-primary" id="btnGuardarKML" onclick="guardarKML()" disabled>💾 &nbsp;Guardar KML</button>
+      <div id="kmlStatus"></div>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:16px;background:var(--light-bg)">
+    <div style="max-width:720px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <h2 style="font-size:15px;font-weight:700;color:var(--g700)">📁 KMLs guardados</h2>
+        <span id="kmlCount" style="font-size:11px;color:#7a9e8a"></span>
+      </div>
+      <div id="kmlList"><p class="ph" style="padding:30px 0">No hay KMLs guardados aún</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB: HISTORIAL ═══════════════ -->
+<div class="tab-content" id="content-historial">
+  <div style="flex:1;overflow-y:auto;padding:16px;background:var(--light-bg)">
+    <div style="max-width:800px;margin:0 auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <h2 style="font-size:15px;font-weight:700;color:var(--g700)">📊 Historial de análisis</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="filtroIdx" onchange="renderHistorial()" style="margin:0;width:auto;font-size:11px;padding:5px 8px">
+            <option value="">Todos los índices</option>
+          </select>
+          <button class="btn btn-danger btn-sm" onclick="limpiarHistorial()" style="font-size:11px;padding:5px 10px">🗑️ Limpiar</button>
+        </div>
+      </div>
+      <div id="historialList"><p class="ph" style="padding:30px 0">No hay análisis registrados aún</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB: BIBLIOTECA ESPECTRAL ═══════════════ -->
+<div class="tab-content" id="content-biblioteca" style="overflow-y:auto;background:var(--light-bg)">
+<div id="biblioteca-root"></div>
+</div>
+<!-- ═══════════════ BOTTOM SHEET MÓVIL ═══════════════ -->
+<div class="bottom-sheet" id="bottomSheet">
+  <div class="bs-handle" onclick="toggleSheet()"></div>
+  <div class="bs-tabs">
+    <button class="bs-tab active" onclick="bsTab('indice')">📐 Índice</button>
+    <button class="bs-tab" onclick="bsTab('config')">📡 Config</button>
+    <button class="bs-tab" onclick="bsTab('stats')">📊 Stats</button>
+    <button class="bs-tab" onclick="bsTab('serie')">📈 Serie</button>
+  </div>
+  <div class="bs-content">
+    <div class="bs-section active" id="bs-indice">
+      <div class="index-grid" id="indexGridMobile"></div>
+      <div class="idx-info" id="idxInfoMobile" style="font-size:11px">Selecciona un índice</div>
+    </div>
+    <div class="bs-section" id="bs-config">
+      <label class="fl">Satélite</label>
+      <select id="sateliteMobile">
+        <option value="S2L2A">Sentinel-2 L2A (10m)</option>
+        <option value="S2L1C">Sentinel-2 L1C (10m)</option>
+      </select>
+      <label class="fl">Fecha inicio</label>
+      <input type="date" id="fechaInicioMobile" value="2024-09-01"/>
+      <label class="fl">Fecha fin</label>
+      <input type="date" id="fechaFinMobile" value="2024-12-31"/>
+      <label class="fl">Máx. nubes: <span id="nubesValMobile" style="color:var(--g400);font-family:'JetBrains Mono'">20%</span></label>
+      <input type="range" id="nubesMobile" min="0" max="100" value="20" step="5"
+             oninput="document.getElementById('nubesValMobile').textContent=this.value+'%'"/>
+      <div style="margin-top:10px">
+        <div class="layer-row">
+          <button class="layer-btn active" id="btnIndiceMobile" onclick="setLayerMobile('indice')">Índice</button>
+          <button class="layer-btn" id="btnRGBMobile" onclick="setLayerMobile('rgb')">Color real</button>
+          <button class="layer-btn" id="btnFalseMobile" onclick="setLayerMobile('false')">Infrarrojo</button>
+        </div>
+      </div>
+      <div id="statusMsgMobile" style="margin-top:8px"></div>
+    </div>
+    <div class="bs-section" id="bs-stats">
+      <div id="statsContainerMobile"><p class="ph">Dibuja un área y presiona ▶</p></div>
+    </div>
+    <div class="bs-section" id="bs-serie">
+      <div id="chartContainerMobile"><p class="ph">El gráfico aparecerá tras calcular</p></div>
+    </div>
+  </div>
+</div>
+<button class="fab" id="fabBtn" onclick="calcularMobile()" title="Calcular índice">▶</button>
+<button class="sheet-toggle" onclick="toggleSheet()" id="sheetToggleBtn">⚙️ Configurar</button>
+
+<script src="app.js"></script>
+</body>
+</html>
+
