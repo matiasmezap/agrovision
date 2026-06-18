@@ -402,24 +402,39 @@ L.drawLocal.edit.toolbar.actions.cancel.title = 'Cancelar edición';
 L.drawLocal.edit.toolbar.actions.cancel.text = 'Cancelar';
 
 const drawnItems = new L.FeatureGroup().addTo(map);
+const POLY_STYLE = {
+  color:'#6fcf4a', weight:2.5,
+  fillColor:'#6fcf4a', fillOpacity:0.12,
+  dashArray: null,
+  lineCap:'round', lineJoin:'round'
+};
 const drawControl = new L.Control.Draw({
   draw:{
     polygon:{
-      shapeOptions:{color:'#f5820d',weight:2.5,fillColor:'#f5820d',fillOpacity:0.18},
-      allowIntersection:true,showArea:true,repeatMode:false
+      shapeOptions: POLY_STYLE,
+      icon: new L.DivIcon({
+        className:'av-vertex-icon',
+        iconSize:[14,14], iconAnchor:[7,7]
+      }),
+      allowIntersection:true, showArea:true, repeatMode:false
     },
-    rectangle:{shapeOptions:{color:'#f5820d',weight:2,fillColor:'#f5820d',fillOpacity:0.12},repeatMode:false},
-    circle:false,circlemarker:false,marker:false,polyline:false
+    rectangle:{
+      shapeOptions:{...POLY_STYLE, fillOpacity:0.10},
+      repeatMode:false
+    },
+    circle:false, circlemarker:false, marker:false, polyline:false
   },
   edit:{featureGroup:drawnItems}
 });
 map.addControl(drawControl);
+// Add QGIS color editor button once UI loads
+setTimeout(addColorEditorBtn, 500);
 
 // Al crear un polígono → se desactiva el dibujo automáticamente y se guarda
 // Botón flotante "Terminar" que aparece al dibujar
 var finishBtn = L.DomUtil.create('div', 'finish-btn');
-finishBtn.innerHTML = '🔴 Terminar (Enter)';
-finishBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#e85a3a;color:#fff;border:none;border-radius:30px;padding:10px 28px;font-size:15px;font-weight:700;z-index:99999;cursor:pointer;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.4);font-family:Plus Jakarta Sans,sans-serif';
+finishBtn.innerHTML = '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:7px"><polyline points="4,10 8,14 16,6"/></svg>Cerrar polígono';
+finishBtn.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#1b422c,#3d8a57);color:#fff;border:none;border-radius:40px;padding:11px 30px;font-size:14px;font-weight:700;z-index:99999;cursor:pointer;display:none;box-shadow:0 6px 24px rgba(0,0,0,0.45),0 0 0 1px rgba(111,207,74,0.4);font-family:Plus Jakarta Sans,sans-serif;display:none;align-items:center;letter-spacing:0.2px;backdrop-filter:blur(4px)';
 document.body.appendChild(finishBtn);
 
 function forceCompleteDrawing() {
@@ -462,7 +477,7 @@ document.addEventListener('keydown', function(e) {
 
 // Mostrar botón Terminar cuando empieza el dibujo
 map.on(L.Draw.Event.DRAWSTART, function() {
-  finishBtn.style.display = 'block';
+  finishBtn.style.display = 'flex';
 });
 
 // Ocultar botón Terminar cuando se completa o cancela
@@ -478,12 +493,7 @@ map.on(L.Draw.Event.CREATED,function(e){
     drawnLayer=e.layer;
     drawnItems.addLayer(drawnLayer);
     setStatus('✅ Polígono guardado — ahora presiona ▶ Calcular índice','success');
-    var div = document.createElement('div');
-    div.className = 'toast-msg';
-    div.innerHTML = '✅ Polígono completado';
-    div.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#1a3a2a;color:#fff;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
-    document.body.appendChild(div);
-    setTimeout(function(){div.style.opacity='0';div.style.transition='opacity 0.5s';setTimeout(function(){div.remove()},500)},2500);
+    showToast('✓ Polígono guardado — presiona ▶ Calcular', 'success');
   } catch(err) {
     console.error('ERROR en CREATED:', err);
     setStatus('❌ Error: ' + err.message,'error');
@@ -831,14 +841,19 @@ async function calcular(){
     const imgUrl=URL.createObjectURL(blob);
     lastImageUrl=imgUrl;
     if(sentinelLayer) map.removeLayer(sentinelLayer);
-    // Recortar imagen al polígono dibujado
-    var clippedUrl = imgUrl;
-    if (drawnLayer && drawnLayer.getLatLngs) {
-      try {
-        clippedUrl = await clipImageToPolygon(imgUrl, drawnLayer, bbox);
-      } catch(e) { console.warn('Clip error:', e); }
+    // Superponemos imagen y aplicamos clip SVG del polígono
+    if(sentinelLayer) map.removeLayer(sentinelLayer);
+    sentinelLayer = L.imageOverlay(imgUrl,[[bbox[1],bbox[0]],[bbox[3],bbox[2]]],{
+      opacity: opacidad, className:'smooth-overlay', interactive: true
+    }).addTo(map);
+    // Aplicar clip SVG del polígono para bordes suaves
+    if(drawnLayer && drawnLayer.getLatLngs) {
+      applyPolygonClip(sentinelLayer, drawnLayer, bbox);
     }
-    sentinelLayer=L.imageOverlay(clippedUrl,[[bbox[1],bbox[0]],[bbox[3],bbox[2]]],{opacity:opacidad,className:'smooth-overlay',interactive:false}).addTo(map);
+    // Click en capa → consulta valor del píxel
+    sentinelLayer.on('click', async function(e){
+      await queryPixelValue(e.latlng, bbox);
+    });
     map.fitBounds([[bbox[1],bbox[0]],[bbox[3],bbox[2]]]);
 
     // Obtener fecha real de la imagen usada y abrir timeline
@@ -1204,7 +1219,7 @@ function kmlToLayer(kmlDoc){
     const raw=node.textContent.trim().split(/\s+/);
     const pts=raw.map(c=>{const p=c.split(',');return[parseFloat(p[1]),parseFloat(p[0])];}).filter(p=>!isNaN(p[0]));
     if(pts.length>2){
-      layers.push(L.polygon(pts,{color:'#f5820d',weight:2.5,fillColor:'#f5820d',fillOpacity:0.15}));
+      layers.push(L.polygon(pts,{color:'#c8963a',weight:2.5,fillColor:'#c8963a',fillOpacity:0.13,dashArray:'6 3'}));
     }
   });
   if(!layers.length) return null;
@@ -2202,4 +2217,304 @@ function renderBiblioteca(){
 </div>`;
 
   root.innerHTML = html;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+//  TOAST NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════
+function showToast(msg, type='success') {
+  const existing = document.querySelector('.av-toast');
+  if(existing) existing.remove();
+  const div = document.createElement('div');
+  div.className = 'av-toast av-toast-'+type;
+  const icons = {success:'✓', warn:'⚠', error:'✕', info:'ℹ'};
+  div.innerHTML = `<span class="av-toast-icon">${icons[type]||'ℹ'}</span><span>${msg}</span>`;
+  document.body.appendChild(div);
+  requestAnimationFrame(()=>{ div.classList.add('av-toast-show'); });
+  setTimeout(()=>{
+    div.classList.remove('av-toast-show');
+    setTimeout(()=>div.remove(), 400);
+  }, 2800);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SVG CLIP — aplica el clip del polígono a la imagen overlay
+//  con bordes suaves, sin canvas
+// ═══════════════════════════════════════════════════════════
+function applyPolygonClip(overlayLayer, polygonLayer, bbox) {
+  try {
+    const [west, south, east, north] = bbox;
+    const latlngs = polygonLayer.getLatLngs()[0];
+    if(!latlngs || latlngs.length < 3) return;
+
+    // Wait for the overlay element to be in the DOM
+    const tryApply = () => {
+      const el = overlayLayer.getElement();
+      if(!el) { setTimeout(tryApply, 80); return; }
+
+      // Build normalized polygon points (0–1 range)
+      const pts = latlngs.map(ll => {
+        const x = ((ll.lng - west) / (east - west)) * 100;
+        const y = ((north - ll.lat) / (north - south)) * 100;
+        return `${x.toFixed(3)}% ${y.toFixed(3)}%`;
+      });
+
+      // Apply CSS clip-path polygon — smooth, pixel-perfect
+      el.style.clipPath = `polygon(${pts.join(', ')})`;
+      el.style.webkitClipPath = `polygon(${pts.join(', ')})`;
+
+      // Smooth image rendering
+      el.style.imageRendering = 'pixelated';
+      el.style.filter = 'contrast(1.05) saturate(1.1)';
+    };
+    setTimeout(tryApply, 100);
+  } catch(e) { console.warn('SVG clip error:', e); }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PIXEL VALUE QUERY — popup con valor del índice al hacer click
+// ═══════════════════════════════════════════════════════════
+let pixelPopup = null;
+
+async function queryPixelValue(latlng, bbox) {
+  // Cierra popup anterior
+  if(pixelPopup) { map.closePopup(pixelPopup); pixelPopup = null; }
+
+  // Mostrar popup de carga
+  pixelPopup = L.popup({
+    className: 'av-pixel-popup av-pixel-loading',
+    closeButton: true,
+    autoClose: false,
+    maxWidth: 240,
+    offset: [0, -8]
+  })
+  .setLatLng(latlng)
+  .setContent(`<div class="pp-loading"><div class="pp-spinner"></div><span>Consultando…</span></div>`)
+  .openOn(map);
+
+  try {
+    const inicio = document.getElementById('fechaInicio').value;
+    const fin    = document.getElementById('fechaFin').value;
+    const nubes  = parseInt(document.getElementById('nubes').value);
+    const sat    = document.getElementById('satelite').value;
+    const idx    = INDICES[currentIndex];
+
+    // Bbox de 50m alrededor del punto
+    const D = 0.0005;
+    const ptBbox = [latlng.lng - D, latlng.lat - D, latlng.lng + D, latlng.lat + D];
+
+    // Evalscript que devuelve el valor raw del índice como R,G,B normalizado
+    const allBands = [...new Set(idx.bands)];
+    const formulaJS = idx.formula.replace(/B(\d+)/g, 's.B$1');
+    const evalRaw = `//VERSION=3
+function setup(){return{input:["${allBands.join('","')}","dataMask"],output:{bands:4}}}
+function evaluatePixel(s){
+  if(s.dataMask===0)return[0,0,0,0];
+  var v=${formulaJS};
+  var t=(v-(${idx.min}))/${idx.max - idx.min};
+  if(t<0)t=0; if(t>1)t=1;
+  return[t,v+1,s.dataMask,1];
+}`;
+
+    const body = {
+      input: {
+        bounds: { bbox: ptBbox, properties: { crs:'http://www.opengis.net/def/crs/EPSG/0/4326' } },
+        data: [{ type: sat, dataFilter: {
+          timeRange: { from: inicio+'T00:00:00Z', to: fin+'T23:59:59Z' },
+          maxCloudCoverage: nubes
+        }}]
+      },
+      output: { width: 4, height: 4, responses:[{identifier:'default',format:{type:'image/png'}}] },
+      evalscript: evalRaw
+    };
+
+    const res = await fetch(PROCESS_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'image/png'},
+      body: JSON.stringify(body)
+    });
+
+    if(!res.ok) throw new Error('API ' + res.status);
+
+    // Lee el PNG y saca el valor del pixel central
+    const blob = await res.blob();
+    const imgUrl = URL.createObjectURL(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = 4; canvas.height = 4;
+    const ctx = canvas.getContext('2d');
+    const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=imgUrl; });
+    ctx.drawImage(img,0,0);
+    const px = ctx.getImageData(2,2,1,1).data; // canal R = t normalizado (0-255), G = v+1 (*255)
+    const t = px[0]/255;
+    const rawVal = (px[1]/255) - 1; // reconstruct: val = (G/255) - 1
+    const noData = px[2] < 10;
+
+    if(noData || px[3] < 10) {
+      updatePixelPopup(latlng, null, idx, t);
+    } else {
+      // Mejor aproximación: usar el canal G para reconstruir valor
+      // val en rango [min, max]
+      const reconstructed = idx.min + t * (idx.max - idx.min);
+      updatePixelPopup(latlng, reconstructed, idx, t);
+    }
+
+  } catch(e) {
+    console.warn('Pixel query error:', e);
+    if(pixelPopup) {
+      pixelPopup.setContent(`<div class="pp-error">Sin datos en este punto</div>`);
+      pixelPopup.update();
+    }
+  }
+}
+
+function updatePixelPopup(latlng, value, idx, t) {
+  if(!pixelPopup) return;
+  const paleta = PALETAS[vizConfig.paleta].colors;
+  const color = value !== null ? interpolatePalette(paleta, t) : '#888';
+  const label = value !== null ? getIndexLabel(idx, value) : 'Sin datos';
+  const valStr = value !== null ? value.toFixed(3) : '—';
+  const coordStr = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+
+  const html = `
+    <div class="pp-root">
+      <div class="pp-swatch" style="background:${color}"></div>
+      <div class="pp-body">
+        <div class="pp-index">${idx.name}</div>
+        <div class="pp-value" style="color:${color}">${valStr}</div>
+        <div class="pp-label">${label}</div>
+        <div class="pp-coord">${coordStr}</div>
+      </div>
+    </div>`;
+
+  pixelPopup._container && pixelPopup._container.classList.remove('av-pixel-loading');
+  pixelPopup.setContent(html);
+  pixelPopup.update();
+}
+
+function getIndexLabel(idx, value) {
+  if(!idx.legend) return '';
+  const range = idx.max - idx.min;
+  const t = (value - idx.min) / range;
+  const legendIdx = Math.min(Math.floor(t * idx.legend.length), idx.legend.length - 1);
+  // Strip HTML tags from legend string
+  return idx.legend[Math.max(0,legendIdx)].replace(/<[^>]+>/g,'').replace(/[🔴🟡🟢💧🩵💚🌿⚪🟫]/gu,'').trim();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  QGIS-STYLE COLOR RAMP EDITOR
+//  Panel avanzado de personalización de paleta con breakpoints
+// ═══════════════════════════════════════════════════════════
+let colorRampEditor = null;
+let customBreakpoints = null; // [{value, color, label}]
+
+function openColorRampEditor() {
+  if(colorRampEditor) { colorRampEditor.remove(); colorRampEditor=null; return; }
+  const idx = INDICES[currentIndex];
+  const paleta = PALETAS[vizConfig.paleta];
+  const nStops = 5;
+  const stops = [];
+  for(let i=0;i<nStops;i++){
+    const t = i/(nStops-1);
+    const val = idx.min + t*(idx.max-idx.min);
+    stops.push({ t, val: val.toFixed(3), color: interpolatePalette(paleta.colors, t) });
+  }
+
+  const panel = document.createElement('div');
+  panel.className = 'cre-panel';
+  panel.innerHTML = `
+    <div class="cre-header">
+      <span class="cre-title">🎨 Editor de rampa</span>
+      <button class="cre-close" onclick="this.closest('.cre-panel').remove();colorRampEditor=null">✕</button>
+    </div>
+    <div class="cre-body">
+      <div class="cre-preview" id="crePreview"></div>
+      <div class="cre-stops" id="creStops"></div>
+      <div class="cre-actions">
+        <select class="cre-preset-sel" onchange="applyPresetRamp(this.value)">
+          <option value="">— Presets —</option>
+          ${Object.entries(PALETAS).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join('')}
+        </select>
+        <button class="cre-btn-apply" onclick="applyColorRampEditor()">✓ Aplicar</button>
+      </div>
+    </div>`;
+
+  document.getElementById('map').appendChild(panel);
+  colorRampEditor = panel;
+  renderCREStops(stops);
+}
+
+function renderCREStops(stops) {
+  const container = document.getElementById('creStops');
+  if(!container) return;
+  container.innerHTML = stops.map((s,i) => `
+    <div class="cre-stop" data-i="${i}">
+      <input class="cre-color-input" type="color" value="${s.color}"
+        oninput="updateCREPreview()" data-i="${i}">
+      <input class="cre-val-input" type="number" value="${s.val}" step="0.05"
+        oninput="updateCREPreview()" data-i="${i}" style="width:68px">
+      <div class="cre-stop-label" style="background:${s.color}"></div>
+    </div>`).join('');
+  updateCREPreview();
+}
+
+function updateCREPreview() {
+  const stops = getCREStops();
+  const preview = document.getElementById('crePreview');
+  if(!preview || !stops.length) return;
+  preview.style.background = `linear-gradient(to right, ${stops.map(s=>s.color).join(',')})`;
+}
+
+function getCREStops() {
+  const container = document.getElementById('creStops');
+  if(!container) return [];
+  const stops = [];
+  container.querySelectorAll('.cre-stop').forEach(row => {
+    const color = row.querySelector('.cre-color-input').value;
+    const val = parseFloat(row.querySelector('.cre-val-input').value);
+    if(!isNaN(val)) stops.push({ color, val });
+  });
+  return stops.sort((a,b)=>a.val-b.val);
+}
+
+function applyPresetRamp(key) {
+  if(!key) return;
+  const paleta = PALETAS[key];
+  const idx = INDICES[currentIndex];
+  const nStops = 5;
+  const stops = [];
+  for(let i=0;i<nStops;i++){
+    const t = i/(nStops-1);
+    stops.push({ t, val: (idx.min + t*(idx.max-idx.min)).toFixed(3), color: interpolatePalette(paleta.colors, t) });
+  }
+  renderCREStops(stops);
+  selectPalette(key);
+}
+
+function applyColorRampEditor() {
+  const stops = getCREStops();
+  if(stops.length < 2) return;
+  customBreakpoints = stops;
+  // Rebuild custom palette from stops and re-run
+  const colors = stops.map(s=>s.color);
+  const key = '_custom';
+  PALETAS[key] = { name:'Personalizado', colors };
+  vizConfig.paleta = key;
+  showToast('Rampa personalizada aplicada — recalcula para ver', 'info');
+  if(colorRampEditor){ colorRampEditor.remove(); colorRampEditor=null; }
+  // Update legend bar
+  updateVizLegend();
+}
+
+// Add button to open the editor in sidebar
+function addColorEditorBtn() {
+  const sec = document.querySelector('.viz-toggle')?.closest('.sec');
+  if(!sec || document.getElementById('btnColorEditor')) return;
+  const btn = document.createElement('button');
+  btn.id = 'btnColorEditor';
+  btn.className = 'btn btn-outline';
+  btn.style.cssText = 'margin-top:8px;width:100%;font-size:11px;gap:7px';
+  btn.innerHTML = '🎨 Editor de rampa avanzado (QGIS)';
+  btn.onclick = openColorRampEditor;
+  sec.appendChild(btn);
 }
