@@ -1,3 +1,4 @@
+
 // ── Generar estrellas/datos en el cielo ──
 (function(){
   const stars=document.getElementById('lpStars');
@@ -401,23 +402,24 @@ L.drawLocal.edit.toolbar.actions.cancel.title = 'Cancelar edición';
 L.drawLocal.edit.toolbar.actions.cancel.text = 'Cancelar';
 
 const drawnItems = new L.FeatureGroup().addTo(map);
-const POLY_STYLE = {color:'#6fcf4a',weight:2.5,fillColor:'#6fcf4a',fillOpacity:0.13};
 const drawControl = new L.Control.Draw({
   draw:{
-    polygon:{shapeOptions:POLY_STYLE,allowIntersection:true,showArea:true,repeatMode:false},
-    rectangle:{shapeOptions:{...POLY_STYLE,fillOpacity:0.10},repeatMode:false},
+    polygon:{
+      shapeOptions:{color:'#f5820d',weight:2.5,fillColor:'#f5820d',fillOpacity:0.18},
+      allowIntersection:true,showArea:true,repeatMode:false
+    },
+    rectangle:{shapeOptions:{color:'#f5820d',weight:2,fillColor:'#f5820d',fillOpacity:0.12},repeatMode:false},
     circle:false,circlemarker:false,marker:false,polyline:false
   },
   edit:{featureGroup:drawnItems}
 });
 map.addControl(drawControl);
-setTimeout(addColorEditorBtn, 600);
 
 // Al crear un polígono → se desactiva el dibujo automáticamente y se guarda
 // Botón flotante "Terminar" que aparece al dibujar
 var finishBtn = L.DomUtil.create('div', 'finish-btn');
-finishBtn.innerHTML = '✓ Cerrar polígono';
-finishBtn.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#235438,#3d8a57);color:#fff;border:none;border-radius:40px;padding:12px 32px;font-size:14px;font-weight:700;z-index:99999;cursor:pointer;display:none;box-shadow:0 6px 24px rgba(0,0,0,0.5),0 0 0 1px rgba(111,207,74,0.4);font-family:Plus Jakarta Sans,sans-serif;letter-spacing:0.2px';
+finishBtn.innerHTML = '🔴 Terminar (Enter)';
+finishBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#e85a3a;color:#fff;border:none;border-radius:30px;padding:10px 28px;font-size:15px;font-weight:700;z-index:99999;cursor:pointer;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.4);font-family:Plus Jakarta Sans,sans-serif';
 document.body.appendChild(finishBtn);
 
 function forceCompleteDrawing() {
@@ -461,7 +463,6 @@ document.addEventListener('keydown', function(e) {
 // Mostrar botón Terminar cuando empieza el dibujo
 map.on(L.Draw.Event.DRAWSTART, function() {
   finishBtn.style.display = 'block';
-  showToast('Haz clic en el mapa para dibujar el polígono','info');
 });
 
 // Ocultar botón Terminar cuando se completa o cancela
@@ -476,8 +477,13 @@ map.on(L.Draw.Event.CREATED,function(e){
     drawnItems.clearLayers();
     drawnLayer=e.layer;
     drawnItems.addLayer(drawnLayer);
-    setStatus('✅ Polígono guardado — presiona ▶ Calcular índice','success');
-    showToast('✓ Polígono guardado','success');
+    setStatus('✅ Polígono guardado — ahora presiona ▶ Calcular índice','success');
+    var div = document.createElement('div');
+    div.className = 'toast-msg';
+    div.innerHTML = '✅ Polígono completado';
+    div.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#1a3a2a;color:#fff;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
+    document.body.appendChild(div);
+    setTimeout(function(){div.style.opacity='0';div.style.transition='opacity 0.5s';setTimeout(function(){div.remove()},500)},2500);
   } catch(err) {
     console.error('ERROR en CREATED:', err);
     setStatus('❌ Error: ' + err.message,'error');
@@ -825,11 +831,14 @@ async function calcular(){
     const imgUrl=URL.createObjectURL(blob);
     lastImageUrl=imgUrl;
     if(sentinelLayer) map.removeLayer(sentinelLayer);
-    if(sentinelLayer) map.removeLayer(sentinelLayer);
-    sentinelLayer=L.imageOverlay(imgUrl,[[bbox[1],bbox[0]],[bbox[3],bbox[2]]],{opacity:opacidad,className:'smooth-overlay',interactive:true}).addTo(map);
-    if(drawnLayer && drawnLayer.getLatLngs) applyPolygonClip(sentinelLayer, drawnLayer, bbox);
-    sentinelLayer.on('click', async function(e){ await queryPixelValue(e.latlng, bbox); });
-    lastBbox = bbox;
+    // Recortar imagen al polígono dibujado
+    var clippedUrl = imgUrl;
+    if (drawnLayer && drawnLayer.getLatLngs) {
+      try {
+        clippedUrl = await clipImageToPolygon(imgUrl, drawnLayer, bbox);
+      } catch(e) { console.warn('Clip error:', e); }
+    }
+    sentinelLayer=L.imageOverlay(clippedUrl,[[bbox[1],bbox[0]],[bbox[3],bbox[2]]],{opacity:opacidad,className:'smooth-overlay',interactive:false}).addTo(map);
     map.fitBounds([[bbox[1],bbox[0]],[bbox[3],bbox[2]]]);
 
     // Obtener fecha real de la imagen usada y abrir timeline
@@ -1195,7 +1204,7 @@ function kmlToLayer(kmlDoc){
     const raw=node.textContent.trim().split(/\s+/);
     const pts=raw.map(c=>{const p=c.split(',');return[parseFloat(p[1]),parseFloat(p[0])];}).filter(p=>!isNaN(p[0]));
     if(pts.length>2){
-      layers.push(L.polygon(pts,{color:'#c8963a',weight:2.5,fillColor:'#c8963a',fillOpacity:0.12,dashArray:'7 4'}));
+      layers.push(L.polygon(pts,{color:'#f5820d',weight:2.5,fillColor:'#f5820d',fillOpacity:0.15}));
     }
   });
   if(!layers.length) return null;
@@ -2193,194 +2202,4 @@ function renderBiblioteca(){
 </div>`;
 
   root.innerHTML = html;
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  NUEVAS FUNCIONES v3
-// ═══════════════════════════════════════════════════════════════
-
-let lastBbox = null;
-
-// ── Toast notifications ──────────────────────────────────────
-function showToast(msg, type) {
-  type = type || 'success';
-  var existing = document.querySelector('.av-toast');
-  if(existing) existing.remove();
-  var div = document.createElement('div');
-  div.className = 'av-toast av-toast-' + type;
-  var icons = {success:'✓', warn:'⚠', error:'✕', info:'ℹ'};
-  div.innerHTML = '<span class="av-ti">' + (icons[type]||'ℹ') + '</span><span>' + msg + '</span>';
-  document.body.appendChild(div);
-  requestAnimationFrame(function(){ div.classList.add('av-toast-show'); });
-  setTimeout(function(){
-    div.classList.remove('av-toast-show');
-    setTimeout(function(){ div.remove(); }, 400);
-  }, 2800);
-}
-
-// ── SVG/CSS Clip — bordes suaves sin canvas ──────────────────
-function applyPolygonClip(overlayLayer, polygonLayer, bbox) {
-  try {
-    var west=bbox[0], south=bbox[1], east=bbox[2], north=bbox[3];
-    var latlngs = polygonLayer.getLatLngs()[0];
-    if(!latlngs || latlngs.length < 3) return;
-    var tryApply = function() {
-      var el = overlayLayer.getElement ? overlayLayer.getElement() : null;
-      if(!el) { setTimeout(tryApply, 100); return; }
-      var pts = latlngs.map(function(ll){
-        var x = ((ll.lng - west) / (east - west) * 100).toFixed(3);
-        var y = ((north - ll.lat) / (north - south) * 100).toFixed(3);
-        return x+'% '+y+'%';
-      });
-      el.style.clipPath = 'polygon(' + pts.join(', ') + ')';
-      el.style.webkitClipPath = 'polygon(' + pts.join(', ') + ')';
-    };
-    setTimeout(tryApply, 120);
-  } catch(e) { console.warn('Clip error:', e); }
-}
-
-// ── Pixel value popup ─────────────────────────────────────────
-var pixelPopup = null;
-
-async function queryPixelValue(latlng, bbox) {
-  if(pixelPopup) { map.closePopup(pixelPopup); pixelPopup = null; }
-  pixelPopup = L.popup({className:'av-pixel-popup',closeButton:true,autoClose:false,maxWidth:240,offset:[0,-8]})
-    .setLatLng(latlng)
-    .setContent('<div class="pp-loading"><div class="pp-spin"></div><span>Consultando…</span></div>')
-    .openOn(map);
-
-  try {
-    var inicio = document.getElementById('fechaInicio').value;
-    var fin    = document.getElementById('fechaFin').value;
-    var nubes  = parseInt(document.getElementById('nubes').value);
-    var sat    = document.getElementById('satelite').value;
-    var idx    = INDICES[currentIndex];
-    var D = 0.0006;
-    var ptBbox = [latlng.lng-D, latlng.lat-D, latlng.lng+D, latlng.lat+D];
-    var allBands = [...new Set(idx.bands)];
-    var formulaJS = idx.formula.replace(/B(\d+)/g, 's.B$1');
-    var evalRaw = '//VERSION=3\nfunction setup(){return{input:["'+allBands.join('","')+'","dataMask"],output:{bands:4}}}\nfunction evaluatePixel(s){\n  if(s.dataMask===0)return[0,0,0,0];\n  var v='+formulaJS+';\n  var t=(v-('+idx.min+'))/'+(idx.max-idx.min)+';\n  if(t<0)t=0;if(t>1)t=1;\n  return[t,t,t,1];\n}';
-
-    var body = {
-      input:{
-        bounds:{bbox:ptBbox,properties:{crs:'http://www.opengis.net/def/crs/EPSG/0/4326'}},
-        data:[{type:sat,dataFilter:{timeRange:{from:inicio+'T00:00:00Z',to:fin+'T23:59:59Z'},maxCloudCoverage:nubes}}]
-      },
-      output:{width:4,height:4,responses:[{identifier:'default',format:{type:'image/png'}}]},
-      evalscript:evalRaw
-    };
-
-    var res = await fetch(PROCESS_URL,{method:'POST',headers:{'Content-Type':'application/json','Accept':'image/png'},body:JSON.stringify(body)});
-    if(!res.ok) throw new Error('API '+res.status);
-
-    var blob = await res.blob();
-    var imgUrl = URL.createObjectURL(blob);
-    var canvas = document.createElement('canvas');
-    canvas.width=4; canvas.height=4;
-    var ctx = canvas.getContext('2d');
-    var img = await new Promise(function(res,rej){ var i=new Image(); i.onload=function(){res(i);}; i.onerror=rej; i.src=imgUrl; });
-    ctx.drawImage(img,0,0);
-    var px = ctx.getImageData(2,2,1,1).data;
-
-    if(px[3] < 10) {
-      if(pixelPopup) pixelPopup.setContent('<div class="pp-error">Sin datos en este punto</div>');
-    } else {
-      var t = px[0]/255;
-      var val = idx.min + t*(idx.max-idx.min);
-      var paleta = PALETAS[vizConfig.paleta].colors;
-      var color = interpolatePalette(paleta, t);
-      var label = getIndexLabel(idx, t);
-      var coordStr = latlng.lat.toFixed(5)+', '+latlng.lng.toFixed(5);
-      var html = '<div class="pp-root"><div class="pp-swatch" style="background:'+color+'"></div><div class="pp-body"><div class="pp-idxname">'+idx.name+'</div><div class="pp-val" style="color:'+color+'">'+val.toFixed(3)+'</div><div class="pp-lbl">'+label+'</div><div class="pp-coord">'+coordStr+'</div></div></div>';
-      if(pixelPopup){ pixelPopup.setContent(html); pixelPopup.update(); }
-    }
-  } catch(e) {
-    console.warn('Pixel query error:',e);
-    if(pixelPopup) pixelPopup.setContent('<div class="pp-error">Error al consultar</div>');
-  }
-}
-
-function getIndexLabel(idx, t) {
-  if(!idx.legend) return '';
-  var i = Math.min(Math.floor(t * idx.legend.length), idx.legend.length-1);
-  return idx.legend[Math.max(0,i)].replace(/<[^>]+>/g,'').replace(/[\u{1F000}-\u{1FFFF}]/gu,'').trim();
-}
-
-// ── Color Ramp Editor (QGIS style) ────────────────────────────
-var colorRampEditor = null;
-
-function addColorEditorBtn() {
-  var sec = document.querySelector('#content-analisis .viz-toggle');
-  if(!sec || document.getElementById('btnColorEditor')) return;
-  var parent = sec.closest ? sec.closest('.sec') : sec.parentNode;
-  if(!parent) return;
-  var btn = document.createElement('button');
-  btn.id = 'btnColorEditor';
-  btn.className = 'btn btn-outline';
-  btn.style.cssText = 'margin-top:9px;width:100%;font-size:11px';
-  btn.innerHTML = '🎨 Editor de rampa avanzado';
-  btn.onclick = openColorRampEditor;
-  parent.appendChild(btn);
-}
-
-function openColorRampEditor() {
-  if(colorRampEditor){ colorRampEditor.remove(); colorRampEditor=null; return; }
-  var idx = INDICES[currentIndex];
-  var paleta = PALETAS[vizConfig.paleta];
-  var nStops = 5;
-  var stopsHtml = '';
-  for(var i=0;i<nStops;i++){
-    var t = i/(nStops-1);
-    var val = (idx.min + t*(idx.max-idx.min)).toFixed(3);
-    var color = interpolatePalette(paleta.colors, t);
-    stopsHtml += '<div class="cre-stop"><input class="cre-color" type="color" value="'+color+'" oninput="updateCREPreview()"><span class="cre-eq">=</span><input class="cre-val" type="number" value="'+val+'" step="0.05" oninput="updateCREPreview()"><div class="cre-dot" style="background:'+color+'"></div></div>';
-  }
-  var presetOpts = Object.entries(PALETAS).map(function(e){ return '<option value="'+e[0]+'">'+e[1].name+'</option>'; }).join('');
-  var panel = document.createElement('div');
-  panel.className = 'cre-panel';
-  panel.innerHTML = '<div class="cre-hdr"><span>🎨 Editor de rampa — '+idx.name+'</span><button class="cre-x" onclick="this.closest(\'.cre-panel\').remove();colorRampEditor=null">✕</button></div><div class="cre-body"><div class="cre-prev" id="crePreview"></div><div class="cre-stops" id="creStops">'+stopsHtml+'</div><div class="cre-foot"><select class="cre-preset" onchange="applyPresetRamp(this.value)"><option value="">— Cargar preset —</option>'+presetOpts+'</select><button class="cre-apply" onclick="applyColorRampEditor()">✓ Aplicar</button></div></div>';
-  document.getElementById('map').appendChild(panel);
-  colorRampEditor = panel;
-  updateCREPreview();
-}
-
-function updateCREPreview() {
-  var stops = getCREStops();
-  var prev = document.getElementById('crePreview');
-  if(!prev||!stops.length) return;
-  prev.style.background = 'linear-gradient(to right,'+stops.map(function(s){return s.color;}).join(',')+')';
-  document.querySelectorAll('.cre-dot').forEach(function(d,i){ if(stops[i]) d.style.background=stops[i].color; });
-}
-
-function getCREStops() {
-  var stops=[];
-  document.querySelectorAll('.cre-stop').forEach(function(row){
-    var color=row.querySelector('.cre-color').value;
-    var val=parseFloat(row.querySelector('.cre-val').value);
-    if(!isNaN(val)) stops.push({color:color,val:val});
-  });
-  return stops.sort(function(a,b){return a.val-b.val;});
-}
-
-function applyPresetRamp(key) {
-  if(!key) return;
-  var paleta=PALETAS[key]; var idx=INDICES[currentIndex];
-  document.querySelectorAll('.cre-stop').forEach(function(row,i,all){
-    var t=all.length===1?0.5:i/(all.length-1);
-    row.querySelector('.cre-color').value=interpolatePalette(paleta.colors,t);
-    row.querySelector('.cre-val').value=(idx.min+t*(idx.max-idx.min)).toFixed(3);
-  });
-  selectPalette(key);
-  updateCREPreview();
-}
-
-function applyColorRampEditor() {
-  var stops=getCREStops();
-  if(stops.length<2) return;
-  var colors=stops.map(function(s){return s.color;});
-  PALETAS['_custom']={name:'Personalizado',colors:colors};
-  vizConfig.paleta='_custom';
-  updateVizLegend();
-  showToast('Rampa personalizada aplicada — recalcula para ver','info');
-  if(colorRampEditor){ colorRampEditor.remove(); colorRampEditor=null; }
 }
