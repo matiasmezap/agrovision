@@ -1,0 +1,12 @@
+{
+  "version": "3.1.0",
+  "date": "2026-06-18",
+  "dateDisplay": "Jun 18, 2026",
+  "changelog": [
+    "Clip SVG de polígono — bordes suaves",
+    "Popup de valor al hacer click en mapa",
+    "Editor de rampa de color tipo QGIS",
+    "Vértices y tooltips modernizados",
+    "Diseño v3 — paleta verde/dorado/lima"
+  ]
+}

@@ -638,3 +638,73 @@ input[type=file] { display: none; }
 
 /* Export PDF */
 body.pdf-export { font-family:Arial,sans-serif; color:var(--g700); padding:32px; max-width:800px; margin:0 auto; overflow:auto; height:auto; }
+
+/* ══════════════════════════════════
+   VERSION BADGE + UPDATE INDICATOR
+   ══════════════════════════════════ */
+.version-badge {
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: var(--r-pill);
+  padding: 5px 13px;
+  font-size: 10px; font-family: var(--font-mono);
+  color: var(--g200); cursor: default;
+  transition: border-color .2s;
+  position: relative;
+}
+.version-badge:hover { border-color: rgba(111,207,74,0.3); }
+
+.vb-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--lime);
+  box-shadow: 0 0 0 0 rgba(111,207,74,0.4);
+  animation: vbPulse 2.5s infinite;
+}
+.vb-dot.outdated { background: var(--gold); box-shadow: 0 0 0 0 rgba(200,150,58,0.4); animation: vbPulseGold 2s infinite; }
+.vb-dot.error    { background: var(--danger); animation: none; }
+
+@keyframes vbPulse {
+  0%  { box-shadow: 0 0 0 0 rgba(111,207,74,0.4); }
+  70% { box-shadow: 0 0 0 5px rgba(111,207,74,0); }
+  100%{ box-shadow: 0 0 0 0 rgba(111,207,74,0); }
+}
+@keyframes vbPulseGold {
+  0%  { box-shadow: 0 0 0 0 rgba(200,150,58,0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(200,150,58,0); }
+  100%{ box-shadow: 0 0 0 0 rgba(200,150,58,0); }
+}
+
+.vb-text { font-weight: 600; letter-spacing: .3px; color: var(--g100); }
+
+.vb-update {
+  background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+  color: #fff; font-size: 9px; font-weight: 700;
+  padding: 2px 8px; border-radius: var(--r-pill);
+  letter-spacing: .4px; animation: vbBlink 1.8s ease-in-out infinite;
+  cursor: pointer;
+}
+.vb-update:hover { filter: brightness(1.15); }
+@keyframes vbBlink { 0%,100%{opacity:1} 50%{opacity:.7} }
+
+/* Tooltip de versión */
+.vb-tooltip {
+  position: absolute; top: calc(100% + 10px); right: 0;
+  background: rgba(10,22,15,0.98); backdrop-filter: blur(16px);
+  border: 1px solid rgba(111,207,74,0.2);
+  border-radius: var(--r-lg); padding: 14px 16px;
+  width: 240px; z-index: 9999;
+  box-shadow: 0 8px 36px rgba(0,0,0,0.5);
+  animation: fadeInUp .2s ease;
+  font-family: var(--font-body);
+}
+.vbt-title { font-size: 11px; font-weight: 700; color: var(--lime-light); margin-bottom: 10px; letter-spacing: .3px; }
+.vbt-row   { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.vbt-row:last-child { border-bottom: none; }
+.vbt-label { font-size: 10px; color: var(--muted); }
+.vbt-value { font-size: 10px; font-family: var(--font-mono); color: var(--g100); font-weight: 600; }
+.vbt-value.new { color: var(--gold-light); }
+.vbt-changelog { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); }
+.vbt-cl-title  { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.vbt-cl-item   { font-size: 10px; color: var(--g200); padding: 2px 0; display: flex; gap: 6px; }
+.vbt-cl-item::before { content: '·'; color: var(--lime); font-weight: 700; }

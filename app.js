@@ -1674,6 +1674,7 @@ async function exportarPDF(){
     await getToken();
     document.getElementById('tokenBadge').textContent='✅ Conectado';
     document.getElementById('tokenBadge').className='badge ok';
+    initVersionBadge();
   } catch(e){
     document.getElementById('tokenBadge').textContent='❌ Sin conexión';
     document.getElementById('tokenBadge').className='badge err';
@@ -2384,4 +2385,109 @@ function applyColorRampEditor() {
   updateVizLegend();
   showToast('Rampa personalizada aplicada — recalcula para ver','info');
   if(colorRampEditor){ colorRampEditor.remove(); colorRampEditor=null; }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  VERSION BADGE + UPDATE CHECKER
+// ═══════════════════════════════════════════════════════════════
+
+// Versión actual hardcodeada — cambia esto cada vez que actualices
+const APP_VERSION = {
+  version: '3.1.0',
+  date: '2026-06-18',
+  dateDisplay: 'Jun 18, 2026',
+  changelog: [
+    'Clip SVG de polígono (bordes suaves)',
+    'Popup de valor al hacer click en mapa',
+    'Editor de rampa de color tipo QGIS',
+    'Vértices y tooltips modernizados',
+    'Diseño v3 — paleta verde/dorado/lima'
+  ]
+};
+
+// URL del archivo de versión en GitHub (raw)
+const VERSION_URL = 'https://raw.githubusercontent.com/matiasmezap/agrovision/main/version.json';
+
+var vbTooltipEl = null;
+
+function initVersionBadge() {
+  var dot  = document.getElementById('vbDot');
+  var text = document.getElementById('vbText');
+  if(dot)  dot.className  = 'vb-dot';
+  if(text) text.textContent = 'v' + APP_VERSION.version + ' · ' + APP_VERSION.dateDisplay;
+
+  // Add click to show tooltip
+  var badge = document.getElementById('versionBadge');
+  if(badge) badge.onclick = toggleVersionTooltip;
+
+  // Check for updates in background
+  checkForUpdates();
+}
+
+async function checkForUpdates() {
+  try {
+    var res = await fetch(VERSION_URL + '?t=' + Date.now());
+    if(!res.ok) return;
+    var remote = await res.json();
+    var dot    = document.getElementById('vbDot');
+    var upd    = document.getElementById('vbUpdate');
+    var text   = document.getElementById('vbText');
+
+    if(remote.version && remote.version !== APP_VERSION.version) {
+      // Update available
+      if(dot)  dot.className = 'vb-dot outdated';
+      if(upd)  { upd.style.display = 'inline-flex'; upd.textContent = '↑ v' + remote.version + ' disponible'; }
+      if(text) text.textContent = 'v' + APP_VERSION.version + ' (actual)';
+      window._remoteVersion = remote;
+    } else {
+      // Up to date
+      if(dot)  dot.className = 'vb-dot';
+      if(text) text.textContent = 'v' + APP_VERSION.version + ' · Al día ✓';
+    }
+  } catch(e) {
+    // No version.json yet or network error — silently ignore
+    console.log('Version check skipped:', e.message);
+  }
+}
+
+function toggleVersionTooltip() {
+  if(vbTooltipEl) { vbTooltipEl.remove(); vbTooltipEl = null; return; }
+  var remote = window._remoteVersion;
+  var isOutdated = remote && remote.version !== APP_VERSION.version;
+
+  var changelog = APP_VERSION.changelog.map(function(c){
+    return '<div class="vbt-cl-item">'+c+'</div>';
+  }).join('');
+
+  var remoteRow = isOutdated ? (
+    '<div class="vbt-row"><span class="vbt-label">Nueva versión</span><span class="vbt-value new">v' + remote.version + ' — ' + (remote.dateDisplay||remote.date||'') + '</span></div>'
+  ) : '';
+
+  var remoteChangelog = (isOutdated && remote.changelog) ? (
+    '<div class="vbt-changelog"><div class="vbt-cl-title">Novedades en v' + remote.version + '</div>' +
+    remote.changelog.map(function(c){ return '<div class="vbt-cl-item">'+c+'</div>'; }).join('') +
+    '</div>'
+  ) : '';
+
+  var html = '<div class="vbt-title">🛰️ AgroVision — Estado del sistema</div>' +
+    '<div class="vbt-row"><span class="vbt-label">Versión instalada</span><span class="vbt-value">v' + APP_VERSION.version + '</span></div>' +
+    '<div class="vbt-row"><span class="vbt-label">Última actualización</span><span class="vbt-value">' + APP_VERSION.dateDisplay + '</span></div>' +
+    '<div class="vbt-row"><span class="vbt-label">Estado</span><span class="vbt-value" style="color:' + (isOutdated ? 'var(--gold-light)' : 'var(--lime)') + '">' + (isOutdated ? '⚠ Actualización disponible' : '✓ Al día') + '</span></div>' +
+    remoteRow +
+    '<div class="vbt-changelog"><div class="vbt-cl-title">Cambios en esta versión</div>' + changelog + '</div>' +
+    remoteChangelog;
+
+  var tooltip = document.createElement('div');
+  tooltip.className = 'vb-tooltip';
+  tooltip.innerHTML = html;
+  document.getElementById('versionBadge').appendChild(tooltip);
+  vbTooltipEl = tooltip;
+
+  // Close on outside click
+  setTimeout(function(){
+    document.addEventListener('click', function handler(e){
+      if(!e.target.closest('#versionBadge')){ tooltip.remove(); vbTooltipEl=null; document.removeEventListener('click',handler); }
+    });
+  }, 100);
 }
